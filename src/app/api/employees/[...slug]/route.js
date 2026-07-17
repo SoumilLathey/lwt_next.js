@@ -1,32 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query, queryOne, execute } from '@/lib/db';
 import { authenticateRequest } from '@/lib/auth';
-import fs from 'fs';
-import path from 'path';
-
-// Helper to save files to public/uploads
-async function saveUploadedFile(file, prefix = 'upload') {
-  if (!file || typeof file === 'string') return null;
-  try {
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-    
-    const ext = path.extname(file.name) || '.png';
-    const filename = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}${ext}`;
-    
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    
-    const filePath = path.join(uploadDir, filename);
-    fs.writeFileSync(filePath, buffer);
-    return `/uploads/${filename}`;
-  } catch (err) {
-    console.error("Employee File Upload save failed:", err);
-    return null;
-  }
-}
+import { saveUploadedFile } from '@/lib/upload';
 
 // GET handler
 export async function GET(req, { params }) {
