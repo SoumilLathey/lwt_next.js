@@ -274,6 +274,21 @@ export async function PATCH(req, { params }) {
       return NextResponse.json({ message: 'Employee password reset successful' });
     }
 
+    // 5. PATCH /api/admin/employees/:id/photo
+    if (resource === 'employees' && action === 'photo') {
+      const formData = await req.formData();
+      const photoFile = formData.get('photo');
+      if (!photoFile) {
+        return NextResponse.json({ error: 'Photo file is required' }, { status: 400 });
+      }
+      const photoPath = await saveUploadedFile(photoFile, 'employee');
+      if (!photoPath) {
+        return NextResponse.json({ error: 'Failed to save photo' }, { status: 500 });
+      }
+      await execute("UPDATE employees SET photoPath = ? WHERE id = ?", [photoPath, id]);
+      return NextResponse.json({ message: 'Employee photo updated', photoPath });
+    }
+
     return NextResponse.json({ error: 'Route not found' }, { status: 404 });
 
   } catch (error) {

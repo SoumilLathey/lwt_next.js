@@ -72,6 +72,16 @@ export async function GET(req, { params }) {
       return NextResponse.json(enquiries);
     }
 
+    // 3. GET /api/employees/profile
+    if (resource === 'profile' && !subAction) {
+      const emp = await queryOne(
+        "SELECT id, name, email, phone, department, photoPath, isActive FROM employees WHERE id = ?",
+        [user.employeeId]
+      );
+      if (!emp) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
+      return NextResponse.json(emp);
+    }
+
     return NextResponse.json({ error: 'Route not found' }, { status: 404 });
 
   } catch (error) {
@@ -189,7 +199,7 @@ export async function POST(req, { params }) {
   }
 }
 
-// PATCH handler (Update Status)
+// PATCH handler (Update Status / Profile Photo)
 export async function PATCH(req, { params }) {
   try {
     const user = authenticateRequest(req);
@@ -199,8 +209,23 @@ export async function PATCH(req, { params }) {
 
     const { slug } = await params;
     const resource = slug[0];
-    const subAction = slug[1]; // id
+    const subAction = slug[1]; // id or 'photo'
     const action = slug[2]; // status
+
+    // 0. PATCH /api/employees/profile/photo (self profile photo update)
+    if (resource === 'profile' && subAction === 'photo') {
+      const formData = await req.formData();
+      const photoFile = formData.get('photo');
+      if (!photoFile) {
+        return NextResponse.json({ error: 'Photo file is required' }, { status: 400 });
+      }
+      const photoPath = await saveUploadedFile(photoFile, 'employee');
+      if (!photoPath) {
+        return NextResponse.json({ error: 'Failed to save photo' }, { status: 500 });
+      }
+      await execute("UPDATE employees SET photoPath = ? WHERE id = ?", [photoPath, user.employeeId]);
+      return NextResponse.json({ message: 'Profile photo updated', photoPath });
+    }
 
     const targetId = parseInt(subAction, 10);
     if (isNaN(targetId)) {

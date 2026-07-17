@@ -36,6 +36,7 @@ export default function AdminDashboard() {
   const [projForm, setProjForm] = React.useState({ name: '', description: '', startDate: '', endDate: '', employeeIds: [] });
   const [passResetVal, setPassResetVal] = React.useState('');
   const [userEditForm, setUserEditForm] = React.useState({ name: '', email: '', phone: '', address: '', pincode: '' });
+  const [empPhotoFile, setEmpPhotoFile] = React.useState(null);
 
   // Loaders & Notifications
   const [loading, setLoading] = React.useState(true);
@@ -426,6 +427,36 @@ export default function AdminDashboard() {
       }
     } catch (err) {
       console.log(err);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleUpdateEmployeePhoto = async (e) => {
+    e.preventDefault();
+    if (!empPhotoFile || !actionTarget) return;
+    setActionLoading(true);
+    const token = localStorage.getItem('lwt_token');
+    const formData = new FormData();
+    formData.append('photo', empPhotoFile);
+    try {
+      const response = await fetch(`/api/admin/employees/${actionTarget.id}/photo`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setNotify({ type: 'success', text: `Photo updated for ${actionTarget.name}!` });
+        setEmpPhotoFile(null);
+        closeActionForm();
+        fetchAdminData(token);
+      } else {
+        setNotify({ type: 'danger', text: data.error || 'Failed to update photo.' });
+      }
+    } catch (err) {
+      console.log(err);
+      setNotify({ type: 'danger', text: 'Connection error.' });
     } finally {
       setActionLoading(false);
     }
@@ -878,6 +909,9 @@ export default function AdminDashboard() {
                               <button onClick={() => openActionForm(emp, 'reset_password_emp')} style={{ flex: 1, background: 'var(--surface-1)', border: '1px solid var(--surface-border-mid)', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', color: 'var(--text-main)' }}>
                                 Reset Pass
                               </button>
+                              <button onClick={() => openActionForm(emp, 'update_emp_photo')} style={{ flex: 1, background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.15)', padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', color: 'var(--color-primary)' }}>
+                                📷 Photo
+                              </button>
                               <button 
                                 onClick={() => handleToggleEmployee(emp.id)} 
                                 style={{ flex: 1, background: emp.isActive ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.06)', border: `1px solid ${emp.isActive ? 'rgba(239,68,68,0.15)' : 'rgba(16,185,129,0.15)'}`, padding: '6px 12px', borderRadius: '8px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', color: emp.isActive ? '#ef4444' : 'var(--success)' }}
@@ -1021,6 +1055,7 @@ export default function AdminDashboard() {
                         {actionType === 'reset_password_user' && 'Reset Customer Password'}
                         {actionType === 'reset_password_emp' && 'Reset Staff Password'}
                         {actionType === 'edit_user' && 'Edit Client Details'}
+                        {actionType === 'update_emp_photo' && `Update Photo — ${actionTarget?.name}`}
                       </h3>
                       <button onClick={closeActionForm} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '24px', fontWeight: 800 }}>&times;</button>
                     </div>
@@ -1389,6 +1424,48 @@ export default function AdminDashboard() {
                         </button>
                       </form>
                     )}
+
+                    {/* Form: Update employee photo */}
+                    {actionType === 'update_emp_photo' && (
+                      <form onSubmit={handleUpdateEmployeePhoto} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                        {/* Current photo preview */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '20px', background: 'var(--surface-2)', padding: '20px', borderRadius: '16px', border: '1px solid var(--surface-border)' }}>
+                          <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(36,82,143,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, border: '3px solid var(--color-primary)' }}>
+                            {empPhotoFile
+                              ? <img src={URL.createObjectURL(empPhotoFile)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : actionTarget?.photoPath
+                                ? <img src={actionTarget.photoPath} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <span style={{ fontSize: '28px' }}>👤</span>
+                            }
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '15px', fontWeight: 700, color: 'var(--heading-color)' }}>{actionTarget?.name}</div>
+                            <div style={{ fontSize: '12px', color: 'var(--color-primary)', fontWeight: 600, marginTop: '2px' }}>{actionTarget?.department}</div>
+                            <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px' }}>
+                              {empPhotoFile ? `New: ${empPhotoFile.name}` : (actionTarget?.photoPath ? 'Current photo on file' : 'No photo set')}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--heading-color)', marginBottom: '8px', display: 'block' }}>Upload New Profile Photo</label>
+                          <input 
+                            type="file"
+                            accept="image/*"
+                            required
+                            onChange={e => setEmpPhotoFile(e.target.files[0] || null)}
+                            style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1.5px solid var(--surface-border-mid)', fontSize: '14px', background: 'var(--surface-2)', color: 'var(--text-main)', outline: 'none' }}
+                          />
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>JPG, PNG or WEBP. Recommended: square image.</span>
+                        </div>
+
+                        <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={actionLoading || !empPhotoFile}>
+                          {actionLoading ? 'Uploading...' : 'Save Profile Photo'}
+                        </button>
+                      </form>
+                    )}
+
+
 
                   </div>
                 )}

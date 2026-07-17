@@ -16,6 +16,7 @@ export default function EmployeeDashboard() {
   // Data States
   const [complaints, setComplaints] = React.useState([]);
   const [enquiries, setEnquiries] = React.useState([]);
+  const [empProfile, setEmpProfile] = React.useState(null);
   
   // Loading & Notification states
   const [loading, setLoading] = React.useState(true);
@@ -31,6 +32,7 @@ export default function EmployeeDashboard() {
   const [otpVal, setOtpVal] = React.useState('');
   const [schedVal, setSchedVal] = React.useState({ date: '', time: '', notes: '' });
   const [imageVal, setImageVal] = React.useState({ file: null, type: 'action_photo', description: '' });
+  const [empPhotoFile, setEmpPhotoFile] = React.useState(null);
 
   React.useEffect(() => {
     const token = localStorage.getItem('lwt_token');
@@ -65,6 +67,12 @@ export default function EmployeeDashboard() {
       if (enqRes.ok) {
         const eData = await enqRes.json();
         setEnquiries(eData);
+      }
+
+      const profRes = await fetch('/api/employees/profile', { headers });
+      if (profRes.ok) {
+        const pData = await profRes.json();
+        setEmpProfile(pData);
       }
     } catch (err) {
       console.error(err);
@@ -222,6 +230,36 @@ export default function EmployeeDashboard() {
     setActionType('');
   };
 
+  const handleSelfPhotoUpdate = async (e) => {
+    e.preventDefault();
+    if (!empPhotoFile) return;
+    setActionLoading(true);
+    setNotify({ type: '', text: '' });
+    const token = localStorage.getItem('lwt_token');
+    const formData = new FormData();
+    formData.append('photo', empPhotoFile);
+    try {
+      const response = await fetch('/api/employees/profile/photo', {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setNotify({ type: 'success', text: 'Profile photo updated successfully!' });
+        setEmpPhotoFile(null);
+        setEmpProfile(prev => ({ ...prev, photoPath: data.photoPath }));
+      } else {
+        setNotify({ type: 'danger', text: data.error || 'Failed to update photo.' });
+      }
+    } catch (err) {
+      console.error(err);
+      setNotify({ type: 'danger', text: 'Connection error. Please try again.' });
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('lwt_token');
     localStorage.removeItem('lwt_user');
@@ -253,11 +291,23 @@ export default function EmployeeDashboard() {
       <main style={{ paddingTop: '80px', flexGrow: 1 }}>
         <div className="container" style={{ padding: '40px 24px 80px', maxWidth: '1200px', margin: '0 auto' }}>
           
-          {/* Dashboard Header */}
+          {/* Dashboard Header with profile avatar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
-            <div>
-              <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--color-secondary)', marginBottom: '8px', background: 'rgba(245,158,11,0.08)', padding: '6px 14px', borderRadius: '100px', border: '1px solid rgba(245,158,11,0.12)' }}>Staff Operations Portal</span>
-              <h1 style={{ fontSize: '32px', fontWeight: 800, color: 'var(--heading-color)', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Hello, {employee?.name || 'Staff Member'}</h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+              {/* Avatar */}
+              <div style={{ position: 'relative', width: '64px', height: '64px', flexShrink: 0 }}>
+                <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', background: 'rgba(36,82,143,0.1)', border: '3px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {empProfile?.photoPath
+                    ? <img src={empProfile.photoPath} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <User size={28} color="var(--color-primary)" />
+                  }
+                </div>
+              </div>
+              <div>
+                <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 800, letterSpacing: '2.5px', textTransform: 'uppercase', color: 'var(--color-secondary)', marginBottom: '4px', background: 'rgba(245,158,11,0.08)', padding: '4px 12px', borderRadius: '100px', border: '1px solid rgba(245,158,11,0.12)' }}>Staff Operations Portal</span>
+                <h1 style={{ fontSize: '28px', fontWeight: 800, color: 'var(--heading-color)', fontFamily: 'Outfit, sans-serif', margin: 0 }}>Hello, {employee?.name || 'Staff Member'}</h1>
+                {empProfile?.department && <p style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 600, margin: '2px 0 0' }}>{empProfile.department}</p>}
+              </div>
             </div>
             <button 
               onClick={handleLogout}
@@ -321,6 +371,25 @@ export default function EmployeeDashboard() {
               }}
             >
               <Briefcase size={16} /> Assigned Leads ({enquiries.length})
+            </button>
+            <button 
+              onClick={() => { setActiveTab('profile'); closeActions(); }}
+              style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '8px', 
+                padding: '12px 20px', 
+                borderRadius: '10px', 
+                background: activeTab === 'profile' ? 'var(--color-primary)' : 'transparent', 
+                color: activeTab === 'profile' ? '#fff' : 'var(--text-muted)', 
+                border: 'none', 
+                cursor: 'pointer', 
+                fontSize: '14px', 
+                fontWeight: 700,
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <User size={16} /> My Profile
             </button>
           </div>
 
@@ -466,6 +535,73 @@ export default function EmployeeDashboard() {
                     </div>
                   ))
                 )
+              )}
+
+              {/* Tab: My Profile */}
+              {activeTab === 'profile' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                  
+                  {/* Profile Info Card */}
+                  <div style={{ background: 'var(--surface-1)', borderRadius: '24px', padding: '32px', border: '1px solid var(--surface-border)', boxShadow: 'var(--shadow-sm)' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--heading-color)', fontFamily: 'Outfit, sans-serif', marginBottom: '28px' }}>My Profile</h2>
+                    
+                    {/* Avatar + Info Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '28px', marginBottom: '32px', flexWrap: 'wrap' }}>
+                      <div style={{ width: '96px', height: '96px', borderRadius: '50%', overflow: 'hidden', background: 'rgba(36,82,143,0.1)', border: '4px solid var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {empProfile?.photoPath
+                          ? <img src={empProfile.photoPath} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <User size={40} color="var(--color-primary)" />
+                        }
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <div style={{ fontSize: '22px', fontWeight: 800, color: 'var(--heading-color)', fontFamily: 'Outfit, sans-serif' }}>{empProfile?.name || employee?.name}</div>
+                        <div style={{ fontSize: '13px', color: 'var(--color-primary)', fontWeight: 700 }}>{empProfile?.department}</div>
+                        <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{empProfile?.email}</div>
+                        {empProfile?.phone && <div style={{ fontSize: '13px', color: 'var(--text-muted)' }}>📞 {empProfile.phone}</div>}
+                      </div>
+                    </div>
+
+                    {/* Divider */}
+                    <div style={{ borderTop: '1px solid var(--surface-border)', paddingTop: '28px' }}>
+                      <h3 style={{ fontSize: '16px', fontWeight: 700, color: 'var(--heading-color)', marginBottom: '20px' }}>Update Profile Photo</h3>
+                      <form onSubmit={handleSelfPhotoUpdate} style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '480px' }}>
+                        
+                        {/* Live preview */}
+                        {empPhotoFile && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', background: 'var(--surface-2)', padding: '16px 20px', borderRadius: '14px', border: '1.5px solid var(--color-primary)' }}>
+                            <div style={{ width: '64px', height: '64px', borderRadius: '50%', overflow: 'hidden', border: '2px solid var(--color-primary)', flexShrink: 0 }}>
+                              <img src={URL.createObjectURL(empPhotoFile)} alt="preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--heading-color)' }}>Preview</div>
+                              <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>{empPhotoFile.name}</div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div>
+                          <label style={{ fontSize: '13px', fontWeight: 600, color: 'var(--heading-color)', marginBottom: '8px', display: 'block' }}>Choose Photo</label>
+                          <input 
+                            type="file"
+                            accept="image/*"
+                            onChange={e => setEmpPhotoFile(e.target.files[0] || null)}
+                            style={{ width: '100%', padding: '10px 14px', borderRadius: '10px', border: '1.5px solid var(--surface-border-mid)', fontSize: '14px', background: 'var(--surface-2)', color: 'var(--text-main)', outline: 'none', boxSizing: 'border-box' }}
+                          />
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '6px', display: 'block' }}>JPG, PNG or WEBP. Square photos work best.</span>
+                        </div>
+
+                        <button 
+                          type="submit"
+                          disabled={actionLoading || !empPhotoFile}
+                          style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', background: !empPhotoFile ? 'var(--surface-border-mid)' : 'var(--color-primary)', color: !empPhotoFile ? 'var(--text-muted)' : '#fff', padding: '12px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: 700, border: 'none', cursor: !empPhotoFile ? 'not-allowed' : 'pointer', width: 'fit-content', transition: 'all 0.2s ease' }}
+                        >
+                          {actionLoading ? 'Uploading...' : '📷 Save Profile Photo'}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+
+                </div>
               )}
             </div>
 
